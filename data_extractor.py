@@ -7,51 +7,50 @@ Original file is located at
     https://colab.research.google.com/drive/1sSOxyER8rYuu43rgbfgxogzN7nFjlOLE
 """
 
-pip install openai
-
-import os
-import openai
+from huggingface_hub import InferenceClient
+from google.colab import userdata
 import json
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+hf_token = userdata.get('Hugging_Face')
 
 def extract_data_with_llm(input_text):
-  prompt = f"""
+
+    client = InferenceClient(
+        token=hf_token,
+        provider="nebius"
+    )
+
+    prompt = f"""
 You are a highly skilled data extraction tool.
 Your task is to extract the name, email, and phone number from the given text.
-You MUST respond with a valid JSON object.
+You MUST respond with a valid JSON string and nothing else should be the output.
 The JSON object MUST have the following keys:
 - `name`: The full name of the person.
 - `email`: The email address of the person.
 - `phone_number`: The phone number of the person.
 
 Text to process:
-{input_text}
-"""
-  try:
-    response = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0,
+{input_text}"""
+
+    try:
+        response = client.chat_completion(
+            # Correct model name for text-based tasks
+            model="meta-llama/Llama-3.1-8B-Instruct",
+            # The prompt must be passed as a dictionary with 'content'
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0
         )
 
-    extracted_json_string = response.choices[0].message.content
-    extracted_data = json.loads(extracted_json_string)
+        extracted_json_string = response.choices[0].message.content
+        extracted_data = json.loads(extracted_json_string)
 
-    return extracted_data
+        return extracted_data
 
-  except openai.APIError as e:
-        print(f"An API error occurred: {e}")
-        return None
-  except json.JSONDecodeError as e:
-        print(f"Failed to decode JSON from LLM response: {e}")
-        print(f"LLM response was: {extracted_json_string}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
         return None
 
-#Example Usage
+# Example Usage
 messy_data = """
 Hello, my name is **Priya Singh**. I am a software engineer.
 You can email me at priya.singh@devcorp.net. If you want to talk, you can call me at +91-9988776655.
@@ -60,8 +59,7 @@ You can email me at priya.singh@devcorp.net. If you want to talk, you can call m
 structured_data = extract_data_with_llm(messy_data)
 
 if structured_data:
-  print("Data extracted succefully")
-  print(json.dumps(structured_data, indent=2))
-
+    print("Data extracted successfully")
+    print(json.dumps(structured_data, indent=2))
 else:
-  print("Data Extraction Failed")
+    print("Data Extraction Failed")
